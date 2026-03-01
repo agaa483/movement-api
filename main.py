@@ -40,6 +40,7 @@ app.add_middleware(
         "http://localhost:3000",
         "http://localhost:3001",
         "https://*.vercel.app",
+        "https://web-production-43f13.up.railway.app",
     ],
     allow_credentials=True,
     allow_methods=["*"],
