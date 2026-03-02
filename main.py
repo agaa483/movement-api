@@ -36,12 +36,7 @@ app = FastAPI(title="Movement Efficiency API", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "http://localhost:3001",
-        "https://movement-frontend.vercel.app",
-        "https://web-production-43f13.up.railway.app",
-    ],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
