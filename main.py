@@ -39,7 +39,7 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:3000",
         "http://localhost:3001",
-        "https://*.vercel.app",
+        "https://movement-frontend.vercel.app",
         "https://web-production-43f13.up.railway.app",
     ],
     allow_credentials=True,
