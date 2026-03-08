@@ -3,7 +3,6 @@ import json
 import os
 from contextlib import asynccontextmanager
 
-import resend
 from dotenv import load_dotenv
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -14,8 +13,6 @@ load_dotenv()
 
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
-resend.api_key = os.getenv("RESEND_API_KEY", "")
-ALERT_EMAIL = os.getenv("ALERT_EMAIL", "")
 
 # Supabase client — only initialized if env vars are present
 supabase = None
@@ -46,60 +43,23 @@ app.add_middleware(
 )
 
 
-# ─── Email alert ──────────────────────────────────────────────────────────────
-
-def send_mei_alert(patient_name: str, mei: float, elapsed: float) -> None:
-    """Send a one-time email alert when MEI drops below threshold."""
-    if not ALERT_EMAIL or not resend.api_key:
-        return
-    try:
-        name_label = patient_name or "Unknown patient"
-        resend.Emails.send({
-            "from": "Movement Efficiency Pipeline <onboarding@resend.dev>",
-            "to": [ALERT_EMAIL],
-            "subject": f"⚠️ MEI Alert — {name_label}",
-            "html": (
-                f"<p><strong>Patient:</strong> {name_label}</p>"
-                f"<p><strong>MEI dropped to {mei}</strong> at {int(elapsed)}s into the session.</p>"
-                f"<p>Threshold: 70 — immediate review recommended.</p>"
-            ),
-        })
-        print(f"[EMAIL] Alert sent → {ALERT_EMAIL} (MEI={mei})")
-    except Exception as e:
-        print(f"[EMAIL] Failed to send alert: {e}")
-
-
 # ─── WebSocket ────────────────────────────────────────────────────────────────
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
     generator = MovementGenerator()
-    patient_name: str = ""
-    alert_sent: bool = False
     print("[WS] Client connected")
 
     async def send_metrics():
         """Push one metrics packet per second."""
-        nonlocal alert_sent
         while True:
             data = generator.generate()
             await websocket.send_text(json.dumps(data))
-
-            # Fire email once when MEI first drops below threshold
-            if not alert_sent and data["mei"] < 70:
-                alert_sent = True
-                send_mei_alert(patient_name, data["mei"], data["elapsed"])
-                await websocket.send_text(json.dumps({
-                    "action": "email_sent",
-                    "email": ALERT_EMAIL,
-                }))
-
             await asyncio.sleep(1)
 
     async def receive_commands():
         """Listen for profile-change commands from the frontend."""
-        nonlocal patient_name, alert_sent
         while True:
             try:
                 raw = await websocket.receive_text()
@@ -107,10 +67,7 @@ async def websocket_endpoint(websocket: WebSocket):
                 if msg.get("action") == "change_profile":
                     profile = msg.get("profile")
                     generator.set_profile(profile)
-                    alert_sent = False  # reset so new profile can trigger alert
                     print(f"[WS] Profile changed → {profile}")
-                elif msg.get("action") == "set_patient":
-                    patient_name = msg.get("name", "")
                 elif msg.get("action") == "ping":
                     await websocket.send_text(json.dumps({"action": "pong"}))
                     print("[WS] Ping → Pong")
