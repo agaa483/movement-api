@@ -90,6 +90,10 @@ async def websocket_endpoint(websocket: WebSocket):
             if not alert_sent and data["mei"] < 70:
                 alert_sent = True
                 send_mei_alert(patient_name, data["mei"], data["elapsed"])
+                await websocket.send_text(json.dumps({
+                    "action": "email_sent",
+                    "email": ALERT_EMAIL,
+                }))
 
             await asyncio.sleep(1)
 
